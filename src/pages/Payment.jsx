@@ -68,32 +68,27 @@ export default function Payment({ cartCount, userRole }) {
 
     setSubmitting(true)
     try {
-      const formData = new FormData()
-      formData.append('screenshot', screenshot)
-      formData.append('orderId', orderId)
-      formData.append('amount', amount)
-      formData.append('shippingAddress', JSON.stringify(shippingAddress))
+      const response = await api.paymentsAPI.submitPayment(
+        orderId,
+        amount,
+        shippingAddress,
+        screenshot
+      )
 
-      const response = await api.post('/payments/submit-payment', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-
-      if (response.data.success) {
+      if (response.success) {
         toast.success('Order placed successfully! Pending admin verification.')
         navigate('/orders', { 
           state: { 
             message: 'Your order has been placed and is pending payment verification.',
-            orderId: response.data.data.order._id
+            orderId: response.data.order._id
           } 
         })
       } else {
-        toast.error(response.data.message || 'Failed to place order')
+        toast.error(response.message || 'Failed to place order')
       }
     } catch (error) {
       console.error('Place order error:', error)
-      toast.error(error.response?.data?.message || 'Failed to place order')
+      toast.error(error.message || 'Failed to place order')
     }
     setSubmitting(false)
   }

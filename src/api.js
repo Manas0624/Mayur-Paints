@@ -305,13 +305,15 @@ export const serviceBookingsAPI = {
 
 /* ── Payments ── */
 export const paymentsAPI = {
-  generateQR: (orderId, amount, shippingAddress) => apiFetch('/payments/generate-qr', { method: 'POST', body: JSON.stringify({ orderId, amount, shippingAddress }) }),
-  uploadScreenshot: async (paymentId, file) => {
+  submitPayment: async (orderId, amount, shippingAddress, file) => {
     const token = getToken()
     const formData = new FormData()
+    formData.append('orderId', orderId)
+    formData.append('amount', amount)
+    formData.append('shippingAddress', JSON.stringify(shippingAddress))
     formData.append('screenshot', file)
     
-    const res = await fetch(`${API_BASE}/payments/${paymentId}/upload-screenshot`, {
+    const res = await fetch(`${API_BASE}/payments/submit-payment`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },
       body: formData
@@ -319,7 +321,7 @@ export const paymentsAPI = {
     
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: res.statusText }))
-      throw new Error(err.message || 'Upload failed')
+      throw new Error(err.message || 'Payment submission failed')
     }
     return res.json()
   },
