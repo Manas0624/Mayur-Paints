@@ -150,7 +150,21 @@ export const addressAPI = {
 export const inventoryAPI = {
   getSummary: async () => {
     const res = await apiFetch('/inventory')
-    return unwrap(res)
+    console.log('Raw API response:', res)
+    
+    // API returns { success, stats, data } or sometimes just { success, data } or raw array
+    const dataArray = Array.isArray(res) ? res : (res.data || [])
+    const stats = res.stats || { totalItems: 0, totalPaints: 0, totalHardware: 0, lowStockItems: 0 }
+    
+    const totalStockValue = dataArray.reduce((sum, item) => sum + ((item.price || 0) * (item.stock || 0)), 0)
+    
+    return {
+      products: dataArray,
+      totalProducts: stats.totalItems || dataArray.length,
+      lowStockItems: stats.lowStockItems || 0,
+      totalStockValue: totalStockValue,
+      stats: stats
+    }
   },
   updateStock: (type, id, stock) => apiFetch(`/inventory/${type}/${id}/stock`, { method: 'PUT', body: JSON.stringify({ stock }) }),
 }
