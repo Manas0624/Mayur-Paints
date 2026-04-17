@@ -1,5 +1,4 @@
 import express from 'express'
-import QRCode from 'qrcode'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -40,10 +39,11 @@ const upload = multer({
   }
 })
 
-// POST /api/payments/generate-qr - Generate QR code for payment
-router.post('/generate-qr', authenticateToken, async (req, res) => {
+// POST /api/payments/submit-payment - Submit payment with screenshot
+router.post('/submit-payment', authenticateToken, upload.single('screenshot'), async (req, res) => {
   try {
-    const { orderId, amount, shippingAddress } = req.body
+    const { orderId, amount, shippingAddress: shippingAddressStr } = req.body
+    const shippingAddress = JSON.parse(shippingAddressStr)
     
     if (!orderId || !amount) {
       return res.status(400).json({
@@ -57,6 +57,13 @@ router.post('/generate-qr', authenticateToken, async (req, res) => {
         success: false,
         message: 'Complete shipping address is required',
         requiresAddress: true
+      })
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment screenshot is required'
       })
     }
     
@@ -79,50 +86,28 @@ router.post('/generate-qr', authenticateToken, async (req, res) => {
     // Check if payment already exists for this order
     let payment = await Payment.findOne({ order: orderId })
     
-    if (payment && payment.status !== 'rejected') {
-      return res.json({
-        success: true,
-        message: 'Payment already exists',
-        data: payment
+    if (payment && payment.status === 'verified') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment already verified for this order'
       })
     }
     
     // Generate payment number
     const paymentNumber = Payment.generatePaymentNumber()
     
-    // Create payment data for QR code
-    const paymentData = {
-      paymentNumber,
-      amount,
-      orderId,
-      merchantName: 'Mayur Paints',
-      upiId: process.env.UPI_ID || 'mayurpaints@upi',
-      note: `Payment for Order #${order.orderNumber}`
-    }
-    
-    // Generate UPI payment string
-    const upiString = `upi://pay?pa=${paymentData.upiId}&pn=${encodeURIComponent(paymentData.merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(paymentData.note)}`
-    
-    // Generate QR code
-    const qrCodeDataURL = await QRCode.toDataURL(upiString, {
-      errorCorrectionLevel: 'H',
-      type: 'image/png',
-      width: 300,
-      margin: 2
-    })
-    
     // Create or update payment record
-    if (payment && payment.status === 'rejected') {
-      // Update existing rejected payment
+    if (payment) {
+      // Update existing payment
       payment.paymentNumber = paymentNumber
       payment.amount = amount
-      payment.qrCode = qrCodeDataURL
-      payment.status = 'pending'
       payment.shippingAddress = shippingAddress
-      payment.paymentScreenshot = null
+      payment.paymentScreenshot = req.file.path
+      payment.status = 'submitted'
+      payment.submittedAt = new Date()
       payment.rejectionReason = null
       payment.rejectedAt = null
-      await payment.addTimelineEntry('pending', 'Payment regenerated after rejection', req.user._id)
+      await payment.addTimelineEntry('submitted', 'Payment screenshot uploaded', req.user._id)
     } else {
       // Create new payment
       payment = await Payment.create({
@@ -130,77 +115,25 @@ router.post('/generate-qr', authenticateToken, async (req, res) => {
         order: orderId,
         user: req.user._id,
         amount,
-        qrCode: qrCodeDataURL,
         shippingAddress,
+        paymentScreenshot: req.file.path,
+        status: 'submitted',
+        submittedAt: new Date(),
         paymentDetails: {
-          upiId: paymentData.upiId
+          upiId: process.env.UPI_ID || 'manashshinde@okaxis'
         },
         timeline: [{
-          status: 'pending',
-          note: 'Payment initiated',
+          status: 'submitted',
+          note: 'Payment screenshot uploaded',
           updatedBy: req.user._id
         }]
       })
     }
     
-    await payment.populate([
-      { path: 'user', select: 'name email phone' },
-      { path: 'order' }
-    ])
-    
-    res.json({
-      success: true,
-      message: 'QR code generated successfully',
-      data: payment
-    })
-  } catch (error) {
-    console.error('Generate QR error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Failed to generate QR code',
-      error: error.message
-    })
-  }
-})
-
-// POST /api/payments/:id/upload-screenshot - Upload payment screenshot
-router.post('/:id/upload-screenshot', authenticateToken, upload.single('screenshot'), async (req, res) => {
-  try {
-    const payment = await Payment.findById(req.params.id)
-    
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payment not found'
-      })
-    }
-    
-    if (payment.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized'
-      })
-    }
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Screenshot file is required'
-      })
-    }
-    
-    // Delete old screenshot if exists
-    if (payment.paymentScreenshot) {
-      const oldPath = payment.paymentScreenshot
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath)
-      }
-    }
-    
-    payment.paymentScreenshot = req.file.path
-    payment.status = 'submitted'
-    payment.submittedAt = new Date()
-    await payment.addTimelineEntry('submitted', 'Payment screenshot uploaded', req.user._id)
+    // Update order status
+    order.paymentStatus = 'pending'
+    order.status = 'pending'
+    await order.save()
     
     await payment.populate([
       { path: 'user', select: 'name email phone' },
@@ -209,14 +142,14 @@ router.post('/:id/upload-screenshot', authenticateToken, upload.single('screensh
     
     res.json({
       success: true,
-      message: 'Screenshot uploaded successfully. Payment pending admin verification.',
+      message: 'Payment submitted successfully. Pending admin verification.',
       data: payment
     })
   } catch (error) {
-    console.error('Upload screenshot error:', error)
+    console.error('Submit payment error:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to upload screenshot',
+      message: 'Failed to submit payment',
       error: error.message
     })
   }
