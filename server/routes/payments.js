@@ -39,7 +39,7 @@ const upload = multer({
   }
 })
 
-// POST /api/payments/submit-payment - Submit payment with screenshot
+// POST /api/payments/submit-payment - Submit payment with confirmation
 router.post('/submit-payment', authenticateToken, upload.single('screenshot'), async (req, res) => {
   try {
     const { orderId, amount, shippingAddress: shippingAddressStr } = req.body
@@ -57,13 +57,6 @@ router.post('/submit-payment', authenticateToken, upload.single('screenshot'), a
         success: false,
         message: 'Complete shipping address is required',
         requiresAddress: true
-      })
-    }
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment screenshot is required'
       })
     }
     
@@ -102,54 +95,53 @@ router.post('/submit-payment', authenticateToken, upload.single('screenshot'), a
       payment.paymentNumber = paymentNumber
       payment.amount = amount
       payment.shippingAddress = shippingAddress
-      payment.paymentScreenshot = req.file.path
-      payment.status = 'submitted'
-      payment.submittedAt = new Date()
-      payment.rejectionReason = null
-      payment.rejectedAt = null
-      await payment.addTimelineEntry('submitted', 'Payment screenshot uploaded', req.user._id)
+      payment.status = 'verified'
+      payment.verifiedAt = new Date()
+      payment.verifiedBy = req.user._id
+      await payment.addTimelineEntry('verified', 'Payment confirmed by user', req.user._id)
     } else {
-      // Create new payment
+      // Create new payment - directly verified since user confirmed
       payment = await Payment.create({
         paymentNumber,
         order: orderId,
         user: req.user._id,
         amount,
         shippingAddress,
-        paymentScreenshot: req.file.path,
-        status: 'submitted',
-        submittedAt: new Date(),
+        status: 'verified',
+        verifiedAt: new Date(),
+        verifiedBy: req.user._id,
         paymentDetails: {
           upiId: process.env.UPI_ID || 'manashshinde@okaxis'
         },
         timeline: [{
-          status: 'submitted',
-          note: 'Payment screenshot uploaded',
+          status: 'verified',
+          note: 'Payment confirmed by user',
           updatedBy: req.user._id
         }]
       })
     }
     
-    // Update order status
-    order.paymentStatus = 'pending'
-    order.status = 'pending'
+    // Update order status to confirmed
+    order.paymentStatus = 'paid'
+    order.status = 'confirmed'
     await order.save()
     
     await payment.populate([
       { path: 'user', select: 'name email phone' },
-      { path: 'order' }
+      { path: 'order' },
+      { path: 'verifiedBy', select: 'name email' }
     ])
     
     res.json({
       success: true,
-      message: 'Payment submitted successfully. Pending admin verification.',
+      message: 'Order placed successfully!',
       data: payment
     })
   } catch (error) {
     console.error('Submit payment error:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to submit payment',
+      message: 'Failed to place order',
       error: error.message
     })
   }

@@ -83,11 +83,28 @@ router.post('/', authenticateToken, async (req, res) => {
       })
     }
 
-    if (!shippingAddress || !shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.pincode) {
+    // Handle both address formats
+    const address = shippingAddress || {}
+    const hasValidAddress = (address.street || address.addressLine1) && 
+                           address.city && 
+                           address.state && 
+                           address.pincode
+
+    if (!hasValidAddress) {
       return res.status(400).json({
         success: false,
-        message: 'Complete shipping address is required'
+        message: 'Complete shipping address is required (street/addressLine1, city, state, pincode)'
       })
+    }
+
+    // Normalize address format
+    const normalizedAddress = {
+      street: address.street || address.addressLine1 || '',
+      city: address.city || '',
+      state: address.state || '',
+      pincode: address.pincode || '',
+      phone: address.phone || '',
+      fullName: address.fullName || address.name || ''
     }
 
     // Calculate total and verify stock
@@ -148,7 +165,7 @@ router.post('/', authenticateToken, async (req, res) => {
       user: req.user._id,
       items: orderItems,
       totalAmount,
-      shippingAddress,
+      shippingAddress: normalizedAddress,
       paymentMethod: paymentMethod || 'cod',
       status: 'pending'
     })
@@ -160,10 +177,16 @@ router.post('/', authenticateToken, async (req, res) => {
     })
   } catch (error) {
     console.error('Create order error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body
+    })
     res.status(500).json({
       success: false,
       message: 'Failed to create order',
-      error: error.message
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 })

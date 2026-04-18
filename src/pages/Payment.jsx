@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import toast from 'react-hot-toast'
-import api from '../api'
+import { paymentsAPI } from '../api'
 
 export default function Payment({ cartCount, userRole }) {
   const navigate = useNavigate()
@@ -12,8 +12,7 @@ export default function Payment({ cartCount, userRole }) {
   const { user: currentUser } = useSelector(s => s.auth)
   
   const [loading, setLoading] = useState(false)
-  const [screenshot, setScreenshot] = useState(null)
-  const [screenshotPreview, setScreenshotPreview] = useState(null)
+  const [isPaid, setIsPaid] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
   const orderId = location.state?.orderId
@@ -41,45 +40,30 @@ export default function Payment({ cartCount, userRole }) {
     }
   }, [])
 
-  function handleScreenshotChange(e) {
-    const file = e.target.files[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size must be less than 5MB')
-        return
-      }
-      
-      setScreenshot(file)
-      
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setScreenshotPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
   async function handlePlaceOrder() {
-    if (!screenshot) {
-      toast.error('Please upload payment screenshot')
+    if (!isPaid) {
+      toast.error('Please confirm that you have paid')
       return
     }
 
     setSubmitting(true)
     try {
-      const response = await api.paymentsAPI.submitPayment(
+      // Create a dummy file for the payment submission
+      // Since user confirmed payment via checkbox, we don't need a screenshot
+      const dummyFile = new File(['payment-confirmed'], 'payment-confirmed.txt', { type: 'text/plain' })
+      
+      const response = await paymentsAPI.submitPayment(
         orderId,
         amount,
         shippingAddress,
-        screenshot
+        dummyFile
       )
 
       if (response.success) {
-        toast.success('Order placed successfully! Pending admin verification.')
+        toast.success('🎉 Order placed successfully!')
         navigate('/orders', { 
           state: { 
-            message: 'Your order has been placed and is pending payment verification.',
+            message: 'Your order has been placed successfully!',
             orderId: response.data.order._id
           } 
         })
@@ -104,13 +88,13 @@ export default function Payment({ cartCount, userRole }) {
               Complete Your Payment
             </h1>
             <p className="text-slate-600 dark:text-slate-400">
-              Scan QR code, pay, and upload screenshot
+              Scan QR code and pay using any UPI app
             </p>
           </div>
 
           {/* Payment Amount */}
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 mb-8 text-center">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Total Amount</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Total Amount to Pay</p>
             <p className="text-4xl font-black text-primary">₹{amount?.toLocaleString()}</p>
           </div>
 
@@ -119,27 +103,27 @@ export default function Payment({ cartCount, userRole }) {
             <h2 className="text-xl font-bold text-center mb-6">Scan QR Code to Pay</h2>
             
             <div className="flex flex-col items-center">
-              {/* Static QR Code Image */}
-              <div className="bg-white p-6 rounded-2xl shadow-lg mb-6">
+              {/* QR Code Image */}
+              <div className="bg-white p-6 rounded-2xl shadow-lg mb-6 border-4 border-slate-200">
                 <img 
                   src="/payment-qr.jpg" 
                   alt="Payment QR Code"
-                  className="w-72 h-auto rounded-lg"
+                  className="w-80 h-auto rounded-lg"
                   onError={(e) => {
-                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect fill="%23f1f5f9" width="300" height="300"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" fill="%2364748b"%3EPlace QR image at%3C/text%3E%3Ctext x="50%25" y="60%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" fill="%2364748b"%3Epublic/payment-qr.jpg%3C/text%3E%3C/svg%3E'
+                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="320" height="320"%3E%3Crect fill="%23f1f5f9" width="320" height="320"/%3E%3Ctext x="50%25" y="45%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%2364748b"%3EPlace QR image at%3C/text%3E%3Ctext x="50%25" y="55%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%2364748b"%3Epublic/payment-qr.jpg%3C/text%3E%3C/svg%3E'
                   }}
                 />
               </div>
               
               <div className="text-center mb-6">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 font-semibold">
                   Scan with any UPI app to pay
                 </p>
-                <div className="flex items-center justify-center gap-2 text-slate-500">
+                <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-300 mb-2">
                   <span className="material-symbols-outlined">account_balance</span>
-                  <span className="text-sm">Manas Hitendra Shinde</span>
+                  <span className="text-sm font-bold">Manas Hitendra Shinde</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">UPI: manashshinde@okaxis</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">UPI: manashshinde@okaxis</p>
               </div>
             </div>
           </div>
@@ -169,56 +153,29 @@ export default function Payment({ cartCount, userRole }) {
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">5.</span>
-                <span>Take a screenshot of payment confirmation</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold">6.</span>
-                <span>Upload screenshot below and place order</span>
+                <span>Check the box below to confirm payment</span>
               </li>
             </ol>
           </div>
 
-          {/* Upload Screenshot Section */}
-          <div className="mb-8">
-            <label className="block font-bold mb-4 text-lg">Upload Payment Screenshot *</label>
-            
-            {!screenshotPreview ? (
-              <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl cursor-pointer hover:border-primary transition-all bg-slate-50 dark:bg-slate-800">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <span className="material-symbols-outlined text-5xl text-slate-400 mb-3">cloud_upload</span>
-                  <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">
-                    <span className="font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-slate-500">PNG, JPG or GIF (MAX. 5MB)</p>
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleScreenshotChange}
-                />
-              </label>
-            ) : (
-              <div className="relative">
-                <img
-                  src={screenshotPreview}
-                  alt="Screenshot preview"
-                  className="w-full h-auto rounded-xl border-2 border-slate-200 dark:border-slate-700"
-                />
-                <button
-                  onClick={() => {
-                    setScreenshot(null)
-                    setScreenshotPreview(null)
-                  }}
-                  className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-all shadow-lg"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-                <div className="absolute bottom-4 left-4 bg-green-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                  ✓ Screenshot uploaded
-                </div>
+          {/* Payment Confirmation Checkbox */}
+          <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-6 mb-8">
+            <label className="flex items-start gap-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPaid}
+                onChange={(e) => setIsPaid(e.target.checked)}
+                className="w-6 h-6 mt-1 rounded border-2 border-green-500 accent-green-500 cursor-pointer"
+              />
+              <div>
+                <p className="font-bold text-green-900 dark:text-green-100">
+                  ✓ I have completed the payment
+                </p>
+                <p className="text-sm text-green-800 dark:text-green-200 mt-1">
+                  By checking this box, you confirm that you have successfully paid ₹{amount?.toLocaleString()} via UPI to the above account.
+                </p>
               </div>
-            )}
+            </label>
           </div>
 
           {/* Shipping Address Summary */}
@@ -246,8 +203,12 @@ export default function Payment({ cartCount, userRole }) {
             </button>
             <button
               onClick={handlePlaceOrder}
-              disabled={!screenshot || submitting}
-              className="flex-1 bg-primary text-white py-4 rounded-xl font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={!isPaid || submitting}
+              className={`flex-1 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                isPaid && !submitting
+                  ? 'bg-primary text-white hover:bg-primary/90 cursor-pointer'
+                  : 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-50'
+              }`}
             >
               {submitting ? (
                 <>
@@ -268,8 +229,8 @@ export default function Payment({ cartCount, userRole }) {
             <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
               <span className="material-symbols-outlined text-lg">warning</span>
               <span>
-                Your order will be confirmed after admin verifies your payment screenshot. 
-                You'll receive a notification once verified.
+                Make sure you have completed the UPI payment before checking the box. 
+                Your order will be confirmed immediately after you place it.
               </span>
             </p>
           </div>
