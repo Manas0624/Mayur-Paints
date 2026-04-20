@@ -73,15 +73,22 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // POST /api/orders - Create order (authenticated users)
 router.post('/', authenticateToken, async (req, res) => {
   try {
+    console.log('📦 Order creation request received')
+    console.log('User:', req.user._id)
+    console.log('Request body:', JSON.stringify(req.body, null, 2))
+    
     const { items, shippingAddress, paymentMethod } = req.body
 
     // Validation
     if (!items || items.length === 0) {
+      console.log('❌ No items in order')
       return res.status(400).json({
         success: false,
         message: 'Order must contain at least one item'
       })
     }
+
+    console.log('✅ Items found:', items.length)
 
     // Handle both address formats
     const address = shippingAddress || {}
@@ -91,11 +98,14 @@ router.post('/', authenticateToken, async (req, res) => {
                            address.pincode
 
     if (!hasValidAddress) {
+      console.log('❌ Invalid address:', address)
       return res.status(400).json({
         success: false,
         message: 'Complete shipping address is required (street/addressLine1, city, state, pincode)'
       })
     }
+
+    console.log('✅ Address valid')
 
     // Normalize address format
     const normalizedAddress = {
@@ -112,33 +122,52 @@ router.post('/', authenticateToken, async (req, res) => {
     const orderItems = []
 
     for (const item of items) {
+      console.log('Processing item:', JSON.stringify(item))
+      
       let product
       let productType
 
       // Determine product type and fetch product
-      if (item.type === 'paint' || item.productType === 'Paint') {
-        product = await Paint.findById(item.productId || item.product)
+      const itemType = item.type || item.productType || 'paint'
+      console.log('Item type:', itemType)
+      
+      if (itemType.toLowerCase() === 'paint') {
+        console.log('Looking for paint with ID:', item.productId || item.id)
+        product = await Paint.findById(item.productId || item.id)
         productType = 'Paint'
-      } else {
-        product = await Hardware.findById(item.productId || item.product)
+      } else if (itemType.toLowerCase() === 'hardware') {
+        console.log('Looking for hardware with ID:', item.productId || item.id)
+        product = await Hardware.findById(item.productId || item.id)
         productType = 'Hardware'
+      } else {
+        console.log('Unknown product type:', itemType)
+        return res.status(400).json({
+          success: false,
+          message: `Unknown product type: ${itemType}`
+        })
       }
 
       if (!product) {
+        console.log('❌ Product not found with ID:', item.productId || item.id)
         return res.status(404).json({
           success: false,
-          message: `Product not found: ${item.name || item.productId}`
+          message: `Product not found: ${item.name || item.productId || item.id}`
         })
       }
 
+      console.log('✅ Product found:', product.name)
+
       // Check stock
-      const quantity = item.qty || item.quantity
+      const quantity = item.qty || item.quantity || 1
       if (product.stock < quantity) {
+        console.log('❌ Insufficient stock for', product.name, '- Available:', product.stock, 'Requested:', quantity)
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for ${product.name}. Available: ${product.stock}`
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`
         })
       }
+
+      console.log('✅ Stock available, deducting', quantity)
 
       // Deduct stock
       product.stock -= quantity
@@ -159,6 +188,12 @@ router.post('/', authenticateToken, async (req, res) => {
     // Generate order ID
     const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
+    console.log('📝 Creating order with:')
+    console.log('  - Order ID:', orderId)
+    console.log('  - Items:', orderItems.length)
+    console.log('  - Total:', totalAmount)
+    console.log('  - Payment Method:', paymentMethod)
+
     // Create order
     const order = await Order.create({
       orderId,
@@ -169,6 +204,8 @@ router.post('/', authenticateToken, async (req, res) => {
       paymentMethod: paymentMethod || 'cod',
       status: 'pending'
     })
+
+    console.log('✅ Order created successfully:', order._id)
 
     res.status(201).json({
       success: true,

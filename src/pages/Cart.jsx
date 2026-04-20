@@ -161,22 +161,9 @@ export default function Cart({ cartItems, onUpdateQuantity, onRemoveItem, onChec
       }
       
       console.log('Placing order with address:', formattedAddress)
+      console.log('Cart items:', cartItems)
       
-      const orderData = {
-        userId: currentUser._id || currentUser.id,
-        items: cartItems.map(item => ({
-          productId: item.id,
-          type: item.type,
-          name: item.name,
-          qty: item.qty,
-          price: item.price
-        })),
-        shippingAddress: formattedAddress,
-        paymentMethod: paymentMethod === 'online' ? 'QR Code' : 'COD',
-        couponCode: appliedCoupon?.code
-      }
-
-      const order = await onCheckout(formattedAddress, orderData.paymentMethod)
+      const order = await onCheckout(formattedAddress, paymentMethod === 'online' ? 'QR Code' : 'COD')
       
       if (order && order._id) {
         // If online payment, redirect to payment page with QR code
