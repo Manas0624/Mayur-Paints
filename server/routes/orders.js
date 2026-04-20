@@ -117,6 +117,15 @@ router.post('/', authenticateToken, async (req, res) => {
       const itemType = (item.type || 'paint').toLowerCase()
       const quantity = item.qty || item.quantity || 1
 
+      // Validate MongoDB ObjectId format
+      if (!productId || !productId.match(/^[0-9a-fA-F]{24}$/)) {
+        console.log(`❌ Invalid product ID format: ${productId}`)
+        return res.status(400).json({
+          success: false,
+          message: `Invalid product ID format: ${productId}`
+        })
+      }
+
       console.log(`Looking for ${itemType} with ID: ${productId}`)
 
       let product

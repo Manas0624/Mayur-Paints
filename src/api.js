@@ -22,7 +22,13 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
-    throw new Error(err.message || 'API request failed')
+    console.error('API Error:', {
+      status: res.status,
+      statusText: res.statusText,
+      url: url,
+      error: err
+    })
+    throw new Error(err.message || err.error || 'API request failed')
   }
   return res.json()
 }
