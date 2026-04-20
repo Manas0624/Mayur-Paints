@@ -61,7 +61,7 @@ export default function Payment({ cartCount, userRole }) {
 
       if (response.success) {
         toast.success('🎉 Order placed successfully!')
-        navigate('/orders', { 
+        navigate('/dashboard', { 
           state: { 
             message: 'Your order has been placed successfully!',
             orderId: response.data.order._id

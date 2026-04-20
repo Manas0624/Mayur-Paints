@@ -59,18 +59,22 @@ function App() {
       }))
       
       const order = await ordersAPI.create({
-        userId: currentUser._id || currentUser.id,
         items: orderItems,
         shippingAddress: shippingAddress, // Already formatted by Cart.jsx
         paymentMethod,
       })
       
       console.log('Order created:', order)
-      dispatch(clearCart())
-      return order
+      
+      if (order && order._id) {
+        dispatch(clearCart())
+        return order
+      }
+      
+      return null
     } catch (err) {
       console.error('Checkout failed:', err)
-      return null
+      throw err
     }
   }
 

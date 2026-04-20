@@ -178,7 +178,7 @@ export default function Cart({ cartItems, onUpdateQuantity, onRemoveItem, onChec
 
       const order = await onCheckout(formattedAddress, orderData.paymentMethod)
       
-      if (order) {
+      if (order && order._id) {
         // If online payment, redirect to payment page with QR code
         if (paymentMethod === 'online') {
           navigate('/payment', {
@@ -203,6 +203,8 @@ export default function Cart({ cartItems, onUpdateQuantity, onRemoveItem, onChec
           triggerConfetti()
           toast.success('Order placed successfully!')
         }
+      } else {
+        toast.error('Failed to create order')
       }
     } catch (error) {
       console.error('Order placement error:', error)
