@@ -7,7 +7,7 @@ import cartReducer from './cartSlice'
 
 // Persist configuration
 const persistConfig = {
-  key: 'root',
+  key: 'mayurpaints',
   storage,
   whitelist: ['cart', 'auth'], // Only persist cart and auth
 }
@@ -24,7 +24,7 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE', 'persist/REGISTER'],
       },
     }),
 })
