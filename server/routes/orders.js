@@ -71,7 +71,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 })
 
 // POST /api/orders - Create order (authenticated users)
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   try {
     console.log('📦 Order creation request')
     console.log('User:', req.user._id)
@@ -203,11 +203,8 @@ router.post('/', authenticateToken, async (req, res) => {
     console.error('❌ Order creation error:', error.message)
     console.error('Stack:', error.stack)
     
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create order',
-      error: error.message
-    })
+    // Pass error to global error handler
+    next(error)
   }
 })
 
