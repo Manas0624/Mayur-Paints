@@ -46,9 +46,12 @@ function App() {
   const handleCheckout = async (shippingAddress, paymentMethod) => {
     if (!currentUser || cartItems.length === 0) return null
     try {
-      console.log('Creating order for user:', currentUser._id || currentUser.id)
-      console.log('Cart items:', cartItems)
-      console.log('Shipping address:', shippingAddress)
+      console.log('=== ORDER CREATION DEBUG ===')
+      console.log('User ID:', currentUser._id || currentUser.id)
+      console.log('Cart items count:', cartItems.length)
+      console.log('Cart items:', JSON.stringify(cartItems, null, 2))
+      console.log('Shipping address:', JSON.stringify(shippingAddress, null, 2))
+      console.log('Payment method:', paymentMethod)
       
       const orderItems = cartItems.map(item => ({
         productId: item.id,
@@ -58,13 +61,15 @@ function App() {
         price: item.price,
       }))
       
+      console.log('Order items to send:', JSON.stringify(orderItems, null, 2))
+      
       const order = await ordersAPI.create({
         items: orderItems,
-        shippingAddress: shippingAddress, // Already formatted by Cart.jsx
+        shippingAddress: shippingAddress,
         paymentMethod,
       })
       
-      console.log('Order created:', order)
+      console.log('✅ Order created successfully:', order)
       
       if (order && order._id) {
         dispatch(clearCart())
@@ -73,7 +78,8 @@ function App() {
       
       return null
     } catch (err) {
-      console.error('Checkout failed:', err)
+      console.error('❌ Checkout failed:', err)
+      console.error('Error message:', err.message)
       throw err
     }
   }

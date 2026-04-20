@@ -22,12 +22,10 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
-    console.error('API Error:', {
-      status: res.status,
-      statusText: res.statusText,
-      url: url,
-      error: err
-    })
+    console.error('❌ API Error Details:')
+    console.error('Status:', res.status)
+    console.error('URL:', url)
+    console.error('Error Response:', JSON.stringify(err, null, 2))
     throw new Error(err.message || err.error || 'API request failed')
   }
   return res.json()
