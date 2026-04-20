@@ -115,19 +115,29 @@ router.post('/', authenticateToken, async (req, res) => {
       
       const productId = item.productId || item.id
       const itemType = (item.type || 'paint').toLowerCase()
-      const quantity = item.qty || 1
+      const quantity = item.qty || item.quantity || 1
 
       console.log(`Looking for ${itemType} with ID: ${productId}`)
 
       let product
-      if (itemType === 'paint') {
-        product = await Paint.findById(productId)
-      } else {
-        product = await Hardware.findById(productId)
+      try {
+        if (itemType === 'paint') {
+          product = await Paint.findById(productId)
+        } else if (itemType === 'hardware') {
+          product = await Hardware.findById(productId)
+        } else {
+          throw new Error(`Invalid product type: ${itemType}`)
+        }
+      } catch (err) {
+        console.log(`❌ Error finding product: ${err.message}`)
+        return res.status(400).json({
+          success: false,
+          message: `Invalid product ID or type: ${err.message}`
+        })
       }
 
       if (!product) {
-        console.log(`❌ Product not found: ${productId}`)
+        console.log(`❌ Product not found: ${productId} (type: ${itemType})`)
         return res.status(404).json({
           success: false,
           message: `Product not found: ${item.name || productId}`
@@ -140,7 +150,7 @@ router.post('/', authenticateToken, async (req, res) => {
       if (product.stock < quantity) {
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for ${product.name}`
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`
         })
       }
 
@@ -148,7 +158,7 @@ router.post('/', authenticateToken, async (req, res) => {
       product.stock -= quantity
       await product.save()
 
-      // Add to order
+      // Add to order - IMPORTANT: productType must be capitalized for enum
       orderItems.push({
         product: product._id,
         productType: itemType === 'paint' ? 'Paint' : 'Hardware',
