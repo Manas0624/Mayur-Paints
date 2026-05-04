@@ -67,7 +67,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 })
 
-// POST /api/orders - Create order - SIMPLIFIED
+// POST /api/orders - Create order - SIMPLIFIED v2
 router.post('/', authenticateToken, async (req, res) => {
   try {
     console.log('📦 Creating order for user:', req.user._id)
