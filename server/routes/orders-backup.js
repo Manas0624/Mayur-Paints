@@ -6,10 +6,12 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// GET /api/orders - List orders
+// GET /api/orders - List orders (admin: all, user: own only)
 router.get('/', authenticateToken, async (req, res) => {
   try {
     let query = {}
+
+    // Regular users can only see their own orders
     if (req.user.role !== 'admin') {
       query.user = req.user._id
     }
@@ -46,10 +48,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
       })
     }
 
+    // Check authorization
     if (req.user.role !== 'admin' && order.user._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized'
+        message: 'Not authorized to view this order'
       })
     }
 
@@ -67,79 +70,129 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 })
 
-// POST /api/orders - Create order - SIMPLIFIED
-router.post('/', authenticateToken, async (req, res) => {
+// POST /api/orders - Create order (authenticated users)
+router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    console.log('📦 Creating order for user:', req.user._id)
-    console.log('📦 Request body:', JSON.stringify(req.body, null, 2))
+    console.log('📦 Order creation request')
+    console.log('User:', req.user._id)
+    console.log('Body:', JSON.stringify(req.body, null, 2))
     
     const { items, shippingAddress, paymentMethod } = req.body
 
-    // Basic validation
+    // Validation
     if (!items || items.length === 0) {
-      console.log('❌ No items in order')
       return res.status(400).json({
         success: false,
         message: 'Order must contain at least one item'
       })
     }
 
-    if (!shippingAddress || !shippingAddress.street || !shippingAddress.city) {
-      console.log('❌ Invalid address')
+    // Validate address
+    const address = shippingAddress || {}
+    if (!(address.street || address.addressLine1) || !address.city || !address.state || !address.pincode) {
       return res.status(400).json({
         success: false,
         message: 'Complete shipping address is required'
       })
     }
 
-    // Process items - SIMPLIFIED
+    // Normalize address
+    const normalizedAddress = {
+      street: address.street || address.addressLine1 || '',
+      city: address.city || '',
+      state: address.state || '',
+      pincode: address.pincode || '',
+      phone: address.phone || '',
+      fullName: address.fullName || address.name || ''
+    }
+
+    // Process items
     let totalAmount = 0
     const orderItems = []
 
     for (const item of items) {
+      console.log('Processing item:', item)
+      
       const productId = item.productId || item.id
       const itemType = (item.type || 'paint').toLowerCase()
       const quantity = item.qty || item.quantity || 1
-      const price = item.price || 0
-      const name = item.name || 'Unknown Product'
 
-      console.log(`📦 Processing: ${name} (${itemType}) x${quantity}`)
+      // Validate MongoDB ObjectId format
+      if (!productId || !productId.match(/^[0-9a-fA-F]{24}$/)) {
+        console.log(`❌ Invalid product ID format: ${productId}`)
+        return res.status(400).json({
+          success: false,
+          message: `Invalid product ID format: ${productId}`
+        })
+      }
 
-      // Add to order items - NO DATABASE LOOKUP
+      console.log(`Looking for ${itemType} with ID: ${productId}`)
+
+      let product
+      try {
+        if (itemType === 'paint') {
+          product = await Paint.findById(productId)
+        } else if (itemType === 'hardware') {
+          product = await Hardware.findById(productId)
+        } else {
+          throw new Error(`Invalid product type: ${itemType}`)
+        }
+      } catch (err) {
+        console.log(`❌ Error finding product: ${err.message}`)
+        return res.status(400).json({
+          success: false,
+          message: `Invalid product ID or type: ${err.message}`
+        })
+      }
+
+      if (!product) {
+        console.log(`❌ Product not found: ${productId} (type: ${itemType})`)
+        return res.status(404).json({
+          success: false,
+          message: `Product not found: ${item.name || productId}`
+        })
+      }
+
+      console.log(`✅ Found: ${product.name}`)
+
+      // Check stock
+      if (product.stock < quantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`
+        })
+      }
+
+      // Deduct stock
+      product.stock -= quantity
+      await product.save()
+
+      // Add to order - IMPORTANT: productType must be capitalized for enum
       orderItems.push({
-        product: productId,
+        product: product._id,
         productType: itemType === 'paint' ? 'Paint' : 'Hardware',
-        name: name,
-        price: price,
-        quantity: quantity
+        name: product.name,
+        price: product.price,
+        quantity
       })
 
-      totalAmount += price * quantity
+      totalAmount += product.price * quantity
     }
 
     // Create order
     const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
     
-    console.log('📦 Creating order with', orderItems.length, 'items, total:', totalAmount)
-
     const order = await Order.create({
       orderId,
       user: req.user._id,
       items: orderItems,
       totalAmount,
-      shippingAddress: {
-        street: shippingAddress.street || shippingAddress.addressLine1,
-        city: shippingAddress.city,
-        state: shippingAddress.state,
-        pincode: shippingAddress.pincode,
-        phone: shippingAddress.phone
-      },
+      shippingAddress: normalizedAddress,
       paymentMethod: paymentMethod || 'cod',
-      status: 'pending',
-      paymentStatus: 'pending'
+      status: 'pending'
     })
 
-    console.log('✅ Order created successfully:', order._id)
+    console.log('✅ Order created:', order._id)
 
     res.status(201).json({
       success: true,
@@ -147,16 +200,15 @@ router.post('/', authenticateToken, async (req, res) => {
       data: order
     })
   } catch (error) {
-    console.error('❌ Order creation error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create order',
-      error: error.message
-    })
+    console.error('❌ Order creation error:', error.message)
+    console.error('Stack:', error.stack)
+    
+    // Pass error to global error handler
+    next(error)
   }
 })
 
-// PUT /api/orders/:id/status - Update order status
+// PUT /api/orders/:id/status - Update order status (Admin only)
 router.put('/:id/status', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { status } = req.body
