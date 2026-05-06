@@ -9,6 +9,7 @@
     "dev": "nodemon index.js",
     "seed": "node seed.js",
     "seed-professional": "node seed-professional.js",
+    "seed-all": "node scripts/resetAndSeed.js",
     "reset": "node reset.js"
   },
   "keywords": [

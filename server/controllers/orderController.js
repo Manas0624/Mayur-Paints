@@ -58,7 +58,7 @@ export const getOrderById = async (req, res) => {
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
-export const createOrder = async (req, res) => {
+export const createOrder = async (req, res, next) => {
   try {
     const { userId, items, shippingAddress, paymentMethod = 'COD' } = req.body
 
