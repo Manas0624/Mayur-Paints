@@ -53,7 +53,9 @@ export default function PaintCalculator({ cartCount, userRole }) {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:3001/api/paint-calculator/calculate', {
+      const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api'
+      
+      const response = await fetch(`${API_BASE}/paint-calculator/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -78,6 +80,7 @@ export default function PaintCalculator({ cartCount, userRole }) {
       if (data.success) {
         setResult(data.data)
         setStep(3)
+        toast.success('Calculation complete!')
       } else {
         toast.error(data.message || 'Calculation failed')
       }
