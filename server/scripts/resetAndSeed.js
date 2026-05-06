@@ -18,17 +18,18 @@ const paintProducts = [
   // ── ASIAN PAINTS ──
   {
     name: "Asian Paints Royale Matt",
+    code: "AP-RM-10L",
     brand: "Asian Paints",
     category: "Interior",
-    finish: "matte",
+    finish: "Matte",
     size: "10L",
     price: 3150,
     stock: 45,
     color: "Brilliant White",
-    hexCode: "#F8F8F5",
+    shade: "White",
     description:
       "Royale Matt is Asian Paints' flagship luxury interior emulsion. It offers a smooth, velvety matt finish that hides surface imperfections beautifully. Superior washability and stain resistance make it ideal for living rooms and bedrooms.",
-    image:
+    img:
       "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=600&h=600&fit=crop&q=85",
     type: "paint",
   },
@@ -1515,6 +1516,79 @@ const hardwareProducts = [
 ];
 
 // ─────────────────────────────────────────────
+//  TRANSFORMATION FUNCTION
+// ─────────────────────────────────────────────
+function transformProduct(product, index) {
+  // Generate unique code if missing
+  if (!product.code) {
+    const brandPrefix = product.brand.substring(0, 2).toUpperCase();
+    const typePrefix = product.type === 'paint' ? 'PT' : 'HW';
+    product.code = `${brandPrefix}-${typePrefix}-${String(index + 1).padStart(3, '0')}`;
+  }
+  
+  // Map categories to valid enum values
+  const categoryMap = {
+    'Interior': 'Interior',
+    'Exterior': 'Exterior',
+    'Waterproofing': 'Waterproofing',
+    'Primers': 'Primers',
+    'Primer & Putty': 'Primers',
+    'Enamel': 'Interior',
+    'Wood Finish': 'Interior',
+    'Texture': 'Interior',
+    // Hardware categories
+    'Power Tools': 'Hardware',
+    'Hand Tools': 'Hardware',
+    'Measuring Tools': 'Hardware',
+    'Adhesives': 'Hardware',
+    'Electrical': 'Hardware',
+    'Fasteners & Fixtures': 'Hardware',
+    'Abrasives': 'Hardware',
+    'Tapes & Sealants': 'Hardware',
+    'Painting Accessories': 'Hardware',
+    'Safety Equipment': 'Hardware',
+    'Building Materials': 'Hardware',
+    'Plumbing': 'Hardware',
+  };
+  
+  product.category = categoryMap[product.category] || (product.type === 'hardware' ? 'Hardware' : 'Interior');
+  
+  // Capitalize finish values
+  if (product.finish) {
+    product.finish = product.finish.charAt(0).toUpperCase() + product.finish.slice(1).toLowerCase();
+    // Map to valid enum values
+    const finishMap = {
+      'Matte': 'Matte',
+      'Satin': 'Satin',
+      'Gloss': 'Gloss',
+      'Semi-gloss': 'Semi-Gloss',
+      'Semi-gloss': 'Semi-Gloss',
+    };
+    product.finish = finishMap[product.finish] || 'Matte';
+  } else {
+    product.finish = 'Matte';
+  }
+  
+  // Rename image to img
+  if (product.image && !product.img) {
+    product.img = product.image;
+    delete product.image;
+  }
+  
+  // Add shade if missing
+  if (!product.shade && product.color) {
+    product.shade = product.color;
+  }
+  
+  // Set default values
+  if (!product.rating) product.rating = 0;
+  if (!product.reviews) product.reviews = 0;
+  if (!product.isActive) product.isActive = true;
+  
+  return product;
+}
+
+// ─────────────────────────────────────────────
 //  SEED FUNCTION
 // ─────────────────────────────────────────────
 async function seedDatabase() {
@@ -1528,14 +1602,16 @@ async function seedDatabase() {
     const deleted = await Product.deleteMany({});
     console.log(`✅ Deleted ${deleted.deletedCount} existing products\n`);
 
-    // Step 2: Combine all products
+    // Step 2: Combine and transform all products
     const allProducts = [...paintProducts, ...hardwareProducts];
+    const transformedProducts = allProducts.map((product, index) => transformProduct(product, index));
+    
     console.log(
-      `📦 Inserting ${allProducts.length} products (${paintProducts.length} paints + ${hardwareProducts.length} hardware)...` 
+      `📦 Inserting ${transformedProducts.length} products (${paintProducts.length} paints + ${hardwareProducts.length} hardware)...` 
     );
 
     // Step 3: Insert all products
-    const inserted = await Product.insertMany(allProducts);
+    const inserted = await Product.insertMany(transformedProducts);
     console.log(`\n✅ Successfully inserted ${inserted.length} products!`);
     console.log(
       `   🎨 Paint products: ${paintProducts.length}` 
