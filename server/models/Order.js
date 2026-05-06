@@ -76,15 +76,15 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 })
 
-// Generate order number before saving
-orderSchema.pre('save', function(next) {
+// Generate order number before saving - FIXED: removed next() call
+orderSchema.pre('save', function() {
   if (!this.orderNumber) {
     const prefix = 'ORD'
     const timestamp = Date.now().toString().slice(-8)
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
     this.orderNumber = `${prefix}${timestamp}${random}`
   }
-  next()
+  // No next() needed - mongoose handles this automatically
 })
 
 export default mongoose.model('Order', orderSchema)
