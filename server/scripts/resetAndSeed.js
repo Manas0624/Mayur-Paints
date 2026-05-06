@@ -2,11 +2,12 @@
 // Run with: node scripts/resetAndSeed.js
 // Or add to package.json: "seed": "node scripts/resetAndSeed.js"
 
-const mongoose = require("mongoose");
-require("dotenv").config();
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+dotenv.config();
 
 // ── adjust this import path to match your project ──
-const Product = require("../models/Product");
+import Product from "../models/Product.js";
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/mayur";
 
