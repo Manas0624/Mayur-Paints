@@ -67,10 +67,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 })
 
-// POST /api/orders - Create order - SIMPLIFIED v3 (NO NEXT)
+// POST /api/orders - Create order - SIMPLIFIED v4 (FIXED PAYMENT METHODS)
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    console.log('📦 [v3] Creating order for user:', req.user._id)
+    console.log('📦 [v4] Creating order for user:', req.user._id)
     console.log('📦 Request body:', JSON.stringify(req.body, null, 2))
     
     const { items, shippingAddress, paymentMethod } = req.body
@@ -117,10 +117,24 @@ router.post('/', authenticateToken, async (req, res) => {
       totalAmount += price * quantity
     }
 
+    // Normalize payment method
+    let normalizedPaymentMethod = 'cod'
+    if (paymentMethod) {
+      const pm = paymentMethod.toLowerCase()
+      if (pm === 'qr code' || pm === 'online' || pm === 'upi') {
+        normalizedPaymentMethod = 'QR Code'
+      } else if (pm === 'cod' || pm === 'cash on delivery') {
+        normalizedPaymentMethod = 'COD'
+      } else {
+        normalizedPaymentMethod = paymentMethod
+      }
+    }
+
     // Create order
     const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
     
     console.log('📦 Creating order with', orderItems.length, 'items, total:', totalAmount)
+    console.log('📦 Payment method:', normalizedPaymentMethod)
 
     const order = await Order.create({
       orderId,
@@ -128,15 +142,15 @@ router.post('/', authenticateToken, async (req, res) => {
       items: orderItems,
       totalAmount,
       shippingAddress: {
-        street: shippingAddress.street || shippingAddress.addressLine1,
-        city: shippingAddress.city,
-        state: shippingAddress.state,
-        pincode: shippingAddress.pincode,
-        phone: shippingAddress.phone
+        street: shippingAddress.street || shippingAddress.addressLine1 || 'N/A',
+        city: shippingAddress.city || 'N/A',
+        state: shippingAddress.state || 'N/A',
+        pincode: shippingAddress.pincode || '000000',
+        phone: shippingAddress.phone || 'N/A'
       },
-      paymentMethod: paymentMethod || 'cod',
+      paymentMethod: normalizedPaymentMethod,
       status: 'pending',
-      paymentStatus: 'pending'
+      paymentStatus: normalizedPaymentMethod === 'COD' ? 'pending' : 'pending'
     })
 
     console.log('✅ Order created successfully:', order._id)
@@ -148,6 +162,7 @@ router.post('/', authenticateToken, async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Order creation error:', error)
+    console.error('❌ Error stack:', error.stack)
     res.status(500).json({
       success: false,
       message: 'Failed to create order',
