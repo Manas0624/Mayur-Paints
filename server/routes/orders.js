@@ -67,10 +67,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 })
 
-// POST /api/orders - Create order - SIMPLIFIED v2
+// POST /api/orders - Create order - SIMPLIFIED v3 (NO NEXT)
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    console.log('📦 Creating order for user:', req.user._id)
+    console.log('📦 [v3] Creating order for user:', req.user._id)
     console.log('📦 Request body:', JSON.stringify(req.body, null, 2))
     
     const { items, shippingAddress, paymentMethod } = req.body
