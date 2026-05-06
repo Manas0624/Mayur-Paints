@@ -67,10 +67,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 })
 
-// POST /api/orders - Create order - SIMPLIFIED v4 (FIXED PAYMENT METHODS)
+// POST /api/orders - Create order - FINAL FIX v5 (NO CACHE)
 router.post('/', authenticateToken, async (req, res) => {
+  // FORCE NEW DEPLOYMENT - v5.0.0
   try {
-    console.log('📦 [v4] Creating order for user:', req.user._id)
+    console.log('📦 [v5.0.0-FINAL] Creating order for user:', req.user._id)
     console.log('📦 Request body:', JSON.stringify(req.body, null, 2))
     
     const { items, shippingAddress, paymentMethod } = req.body
@@ -118,9 +119,9 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // Normalize payment method
-    let normalizedPaymentMethod = 'cod'
+    let normalizedPaymentMethod = 'COD'
     if (paymentMethod) {
-      const pm = paymentMethod.toLowerCase()
+      const pm = String(paymentMethod).toLowerCase()
       if (pm === 'qr code' || pm === 'online' || pm === 'upi') {
         normalizedPaymentMethod = 'QR Code'
       } else if (pm === 'cod' || pm === 'cash on delivery') {
@@ -155,7 +156,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     console.log('✅ Order created successfully:', order._id)
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Order created successfully',
       data: order
@@ -163,10 +164,11 @@ router.post('/', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('❌ Order creation error:', error)
     console.error('❌ Error stack:', error.stack)
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to create order',
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 })

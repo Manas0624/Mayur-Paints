@@ -94,8 +94,9 @@ app.get('/api/health', async (req, res) => {
     status: 'ok',
     db: dbStatus,
     timestamp: new Date().toISOString(),
-    version: '2.0.6-clean',
-    orderRoute: 'simplified-v4-only'
+    version: '5.0.0-FINAL-FIX',
+    orderRoute: 'v5-no-cache',
+    deployTime: new Date().toISOString()
   })
 })
 

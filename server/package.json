@@ -10,7 +10,8 @@
     "seed": "node seed.js",
     "seed-professional": "node seed-professional.js",
     "seed-all": "node scripts/resetAndSeed.js",
-    "reset": "node reset.js"
+    "reset": "node reset.js",
+    "build": "echo 'Build complete - v5.0.0'"
   },
   "keywords": [
     "ecommerce",
